@@ -1,70 +1,3 @@
-use nom::character::complete::char;
-use nom::multi::many0;
-use nom::branch::alt;
-use nom::combinator::map;
-use nom::sequence::tuple;
-use nom::IResult;
-use nom::error::{context, VerboseError};
-
-
-
-type Res<T, U> = IResult<T, U, VerboseError<T>>;
-
-#[derive(Debug)]
-enum ScopeType {
-    Parenthesis,
-    Brackets,
-    CurlyBrackets,
-    Chevrons,
-}
-
-#[derive(Debug)]
-struct Scope {
-    inner: Vec<Scope>,
-    kind: ScopeType
-}
-
-fn parenthesis(input: &str) -> Res<&str, Scope> {
-    let (input, (_, inner, _)) = context("parenthesis",
-        tuple((char('('), many0(scope), char(')'))))(input)?;
-    Ok((input, Scope{
-        inner,
-        kind: ScopeType::Parenthesis
-    }))
-}
-fn brackets(input: &str) -> Res<&str, Scope> {
-    let (input, (_, inner, _)) = context("brackets",
-     tuple((char('['), many0(scope), char(']'))))(input)?;
-    Ok((input, Scope{
-        inner,
-        kind: ScopeType::Brackets
-    }))
-}
-fn curly_brackets(input: &str) -> Res<&str, Scope> {
-    let (input, (_, inner, _)) = context("curly_brackets",
-     tuple((char('{'), many0(scope), char('}'))))(input)?;
-    Ok((input, Scope{
-        inner,
-        kind: ScopeType::CurlyBrackets
-    }))
-}
-fn chevrons(input: &str) -> Res<&str, Scope> {
-    let (input, (_, inner, _)) = context("chevrons",
-     tuple((char('<'), many0(scope), char('>'))))(input)?;
-    Ok((input, Scope{
-        inner,
-        kind: ScopeType::Chevrons
-    }))
-}
-
-fn scope(input: &str) -> Res<&str, Scope> {
-    alt((
-        parenthesis,
-        brackets,
-        curly_brackets,
-        chevrons,
-    ))(input)
-}
 
 fn main() {
     let input = include_str!("input.txt");
@@ -73,32 +6,87 @@ fn main() {
 }
 
 
-fn parse(input: &str) -> usize {
-    0
-}
-
 fn solve_2(input: &str) -> usize {
-    0
+    let mut scores: Vec<_> = input.lines().filter_map(|l|{
+        if let Damage::Missing(missing) = find_premature_char(l) {
+            Some(missing.iter().fold(0, |acc, c|{
+                acc * 5 + match c {
+                    ')' => 1,
+                    ']' => 2,
+                    '}' => 3,
+                    '>' => 4,
+                    _ => panic!("wrong char : {}", c)
+                }
+            }))
+        } else {
+            None
+        }
+    }).collect();
+
+    scores.sort();
+    println!("scores: {:#?}", scores);
+    scores[scores.len() / 2]
 }
 
 fn solve_1(input: &str) -> usize {
-    0
+    input.lines().map(|l| {
+        if let Damage::Corrupted(c) = find_premature_char(l) {
+            match c {
+                ')' => 3,
+                ']' => 57,
+                '}' => 1197,
+                '>' => 25137,
+                _ => panic!("unexpected wrong char {}", c)
+            }
+        } else {
+            0
+        }
+    }).sum()
+}
+
+#[derive(Debug, PartialEq)]
+enum Damage {
+    Corrupted(char),
+    Missing(Vec<char>)
+}
+
+
+fn find_premature_char(input: &str) -> Damage {
+    let mut stack_opened = Vec::<char>::new();
+
+    for c in input.chars() {
+        match c {
+            '<'|'('|'['|'{' => stack_opened.push(c),
+            c => {
+                if matching_pair(&c) != stack_opened.pop().unwrap() {
+                    return Damage::Corrupted(c);
+                }
+            } 
+        }
+    }
+    Damage::Missing(stack_opened.iter().rev().map(matching_pair).collect()) 
+}
+
+#[inline(always)]
+fn matching_pair(c: &char) -> char {
+    match c {
+        ')' => '(',
+        ']' => '[',
+        '}' => '{',
+        '>' => '<',
+        '(' => ')',
+        '[' => ']',
+        '{' => '}',
+        '<' => '>',
+        _ => panic!("Not a closing char")
+    }
 }
 
 #[test]
 fn test_1line() {
     let line = "{([(<{}[<>[]}>{[]{[(<()>";
-    let res = scope(line);
 
-    match res {
-        Ok((rest, scope)) => {
-            println!("rest: {}, scope {:#?}", rest, scope);
-        }
-        Err(err) => {
-            println!("err: {:#?}", err);
-        }
-        
-    }
+    assert_eq!(find_premature_char(line), Damage::Corrupted('}'));
 }
 
 #[test]
@@ -110,5 +98,5 @@ fn test_sample1() {
 #[test]
 fn test_sample2() {
     let input = include_str!("sample.txt");
-    assert_eq!(solve_2(&input), 12)
+    assert_eq!(solve_2(&input), 288957)
 }
