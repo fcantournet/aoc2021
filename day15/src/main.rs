@@ -22,9 +22,15 @@ impl Grid {
     }
 
     fn tiled_cost(&self, x: isize, y: isize) -> Option<usize> {
+        let R = x / self.cols as isize;
+        let D = y / self.rows as isize;
+        if R > 4 || D > 4 {
+            return None;
+        }
+
         let cost = *self.map.get(&(x % self.rows as isize , y % self.cols as isize))?;
-        let n = x / self.rows as isize + y / self.cols as isize;
-        Some((cost + n as usize -1) % 9 + 1)
+        let n = (R + D) as usize;
+        Some((cost + n -1) % 9 + 1)
     }
 }
 
@@ -40,7 +46,7 @@ fn parse(input: &str) -> Grid {
             y_max = y;
         }
     }
-    Grid{map, rows: x_max + 1, cols: y_max +1}
+    Grid{map, cols: x_max + 1, rows: y_max +1}
 }
 
 fn solve_2(input: &str) -> usize {
@@ -62,8 +68,8 @@ fn shortest_path(tiling: usize, visited: &mut HashSet<(isize,isize)>, grid: &Gri
     let mut pq = BinaryHeap::new();
     pq.push((Reverse(0usize), (0isize, 0isize)));
 
-    let x_max = (grid.rows * tiling - 1) as isize;
-    let y_max = (grid.cols * tiling - 1) as isize;
+    let x_max = (grid.cols * tiling - 1) as isize;
+    let y_max = (grid.rows * tiling - 1) as isize;
 
     while let Some((cost, (x, y))) = pq.pop() {
         println!("Visiting ({}, {} at cost {}", x, y, cost.0);
@@ -73,6 +79,7 @@ fn shortest_path(tiling: usize, visited: &mut HashSet<(isize,isize)>, grid: &Gri
         if visited.contains(&(x, y)) {
             continue;
         }
+
 
         for (dx, dy) in [(-1, 0), (1,0), (0, -1), (0, 1)] {
             if let Some(next_cost) = cost_fn(&grid, x+dx, y+dy) {
